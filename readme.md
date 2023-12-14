@@ -35,7 +35,6 @@ options: [see options](https://github.com/mafintosh/streamx/tree/master?tab=read
 import { fromWeb } from "streamx-webstream";
 import b4a from "b4a";
 
-// Creates a lock on the readable web stream
 const readableWebStream = new ReadableStream({
     start(controller) {
         controller.enqueue(b4a.from("hello"));
@@ -45,6 +44,8 @@ const readableWebStream = new ReadableStream({
 });
 
 const buffered = [];
+
+// Creates a lock on the readable web stream
 const readableStreamX = fromWeb(readableWebStream, {
     // Add whatever streamx options you want.
     map(buffer) {
