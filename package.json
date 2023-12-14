@@ -23,8 +23,5 @@
     "./to": {
       "default": "./lib/toWeb.js"
     }
-  },
-  "devDependencies": {
-    "brittle": "^3.3.2"
   }
 }
