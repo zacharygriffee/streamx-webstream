@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test</title>
+</head>
+<body>
+    <script type="importmap">
+        {
+            "imports": {
+                "streamx": "https://esm.run/streamx",
+                "brittle": "https://esm.run/brittle",
+                "b4a": "https://esm.run/b4a"
+            }
+        }
+    </script>
+    <script type="module">
+        import {fromWeb, toWeb} from "./index.js";
+        import {Readable} from "streamx";
+        import {test, solo} from "brittle";
+        import b4a from "b4a";
+
+        test('streamx to web readable stream', async t => {
+            t.plan(7)
+
+            const r = new Readable()
+            const buffered = []
+            let ended = 0
+
+            r.push('hello')
+            r.push('world')
+            r.push(null)
+
+            const webStreamReadable = toWeb(r);
+            const reader = webStreamReadable.getReader();
+
+            r.on("close", () => t.pass("closed", "Streamx closed successfully"));
+            r.on('end', () => ended++)
+
+            while(true) {
+                const {value, done} = await reader.read();
+                if (value) buffered.push(b4a.toString(value));
+                if (done) break;
+            }
+
+            t.is(buffered[0] + buffered[1], "helloworld", "Received helloworld streamx->ReadableStream");
+            t.is(ended, 1, "streamx end event was emitted")
+            t.ok(r.destroyed, "streamx destroyed properly");
+
+            reader.closed.then(
+                () => t.pass("ReadableStream closed")
+            );
+
+            t.ok(webStreamReadable.locked, "ReadableStream has lock still");
+            reader.releaseLock();
+            t.absent(webStreamReadable.locked, "ReadableStream lock released");
+        });
+
+        test('web readable stream to streamx', async t => {
+            t.plan(6);
+            const webStreamReadable = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(b4a.from("hello"));
+                    controller.enqueue(b4a.from("world"));
+                    controller.close();
+                }
+            });
+
+            const streamxReadable = fromWeb(webStreamReadable);
+            const buffered = [];
+            let ended = 0
+
+            streamxReadable.once('end', () => ended++)
+
+            streamxReadable.on("data", o => {
+                buffered.push(b4a.toString(o));
+            });
+
+            streamxReadable.once("close", async () => {
+                t.pass("closed", "Streamx closed successfully");
+                t.is(buffered[0] + buffered[1], "helloworld", "Received helloworld ReadableStream->streamx");
+                t.is(ended, 1, "streamx end event was emitted")
+                t.ok(streamxReadable.destroyed, "streamx destroyed properly");
+                t.ok(webStreamReadable.locked, "Web stream is still locked to instance, must be closed");
+                t.comment("streamx may have already closed by now but the webstream needs some cleanup")
+                await streamxReadable.close();
+                t.absent(webStreamReadable.locked, "Web stream closed.");
+            });
+        });
+
+        test('web readable stream to streamx with streamx options', async t => {
+            t.plan(6);
+            const webStreamReadable = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(
+                        b4a.from(
+                            JSON.stringify({hello: "world"})
+                        )
+                    );
+
+                    controller.enqueue(
+                        b4a.from(
+                            JSON.stringify({foo: "bar"})
+                        )
+                    );
+
+                    controller.close();
+                }
+            });
+
+            const streamxReadable = fromWeb(webStreamReadable, {
+                map(o) {
+                    return JSON.parse(
+                        b4a.toString(o)
+                    )
+                }
+            });
+            const buffered = [];
+            let ended = 0
+
+            streamxReadable.once('end', () => ended++)
+
+            streamxReadable.on("data", o => {
+                buffered.push(o);
+            });
+
+            streamxReadable.once("close", async () => {
+                t.pass("closed", "Streamx closed successfully");
+                t.is(buffered[0].hello + buffered[1].foo, "worldbar", "Received worldbar ReadableStream->streamx");
+                t.is(ended, 1, "streamx end event was emitted")
+                t.ok(streamxReadable.destroyed, "streamx destroyed properly");
+                t.ok(webStreamReadable.locked, "Web stream is still locked to instance, must be closed");
+                t.comment("streamx may have already closed by now but the webstream needs some cleanup")
+                await streamxReadable.close();
+                t.absent(webStreamReadable.locked, "Web stream closed.");
+            });
+        });
+    </script>
+</body>
+</html>

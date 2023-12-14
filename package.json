@@ -1,0 +1,30 @@
+{
+  "name": "streamx-webstream",
+  "type": "module",
+  "license": "MIT",
+  "main": "index.js",
+  "browser": "index.js",
+  "description": "fromWeb/toWeb for streamx",
+  "version": "0.1.0",
+  "scripts": {
+    "test": "echo \"Run test.html with a server\" && exit 1"
+  },
+  "dependencies": {
+    "b4a": "^1.6.4",
+    "streamx": "^2.15.6"
+  },
+  "exports": {
+    ".": {
+      "default": "./index.js"
+    },
+    "./from": {
+      "default": "./lib/fromWeb.js"
+    },
+    "./to": {
+      "default": "./lib/toWeb.js"
+    }
+  },
+  "devDependencies": {
+    "brittle": "^3.3.2"
+  }
+}
