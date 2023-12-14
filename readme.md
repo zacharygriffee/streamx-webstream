@@ -21,6 +21,10 @@ import {fromWeb} from "streamx-webstream/from";
 // or treeshake
 
 import {toWeb} from "streamx-webstream/to";
+
+// or CDN (and can tree shake that too)
+
+import {fromWeb, toWeb} from "https://esm.run/streamx-webstream";
 ```
 
 

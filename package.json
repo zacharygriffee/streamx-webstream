@@ -5,7 +5,7 @@
   "main": "index.js",
   "browser": "index.js",
   "description": "fromWeb/toWeb for streamx",
-  "version": "0.1.14",
+  "version": "0.1.13",
   "homepage": "https://github.com/zacharygriffee/streamx-webstream#readme",
   "scripts": {
     "test": "echo \"Run test.html with a server\" && exit 0"
