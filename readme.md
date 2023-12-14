@@ -1,6 +1,6 @@
 # streamx-webstream
 
-A toWeb/fromWeb wrapper for [streamx streams](https://www.npmjs.com/package/streamx).
+A toWeb/fromWeb wrapper for [streamx streams](https://github.com/mafintosh/streamx#readme).
 
 Object mode not supported.
 
