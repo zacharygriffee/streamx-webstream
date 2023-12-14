@@ -76,9 +76,9 @@ import b4a from "b4a";
 
 const buffered = [];
 const readable = new Readable();
-r.push('hello');
-r.push('world');
-r.push(null);
+readable.push('hello');
+readable.push('world');
+readable.push(null);
 
 const webStreamReadable = toWeb(readable);
 const reader = webStreamReadable.getReader();
