@@ -14,11 +14,11 @@ npm install streamx-webstream --save
 ```ecmascript 6
 import {fromWeb, toWeb} from "streamx-webstream";
 
-// or
+// or treeshake
 
 import {fromWeb} from "streamx-webstream/from";
 
-// or
+// or treeshake
 
 import {toWeb} from "streamx-webstream/to";
 ```
