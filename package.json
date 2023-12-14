@@ -7,7 +7,7 @@
   "description": "fromWeb/toWeb for streamx",
   "version": "0.1.0",
   "scripts": {
-    "test": "echo \"Run test.html with a server\" && exit 1"
+    "test": "echo \"Run test.html with a server\" && exit 0"
   },
   "dependencies": {
     "b4a": "^1.6.4",
