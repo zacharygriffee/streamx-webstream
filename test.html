@@ -142,8 +142,8 @@
         t.plan(10);
         let ended = 0;
 
-        const pipedFromDuplexBuffer = [];
-        const writtenIntoDuplexBuffer = [];
+        const readBuffer = [];
+        const writeBuffer = [];
 
         const webStreamReadable = new ReadableStream({
             start(controller) {
@@ -155,7 +155,7 @@
 
         const webStreamWritable = new WritableStream({
             write(val) {
-                pipedFromDuplexBuffer.push(val);
+                readBuffer.push(val);
             }
         });
 
@@ -164,7 +164,7 @@
         const streamDuplex = fromWeb(webStreamReadable, {
             // Adding this 'write' function turns it into duplex.
             write(val, cb) {
-                writtenIntoDuplexBuffer.push(val);
+                writeBuffer.push(val);
                 cb();
             },
             // you can then use streamx mapper function for the respective direction
@@ -190,16 +190,16 @@
 
         streamDuplex.once("end", () => ended++);
         streamDuplex.once("close", async () => {
-            const [intoDuplex1, intoDuplex2, intoDuplex3] = writtenIntoDuplexBuffer;
-            const [fromWeb1, fromWeb2, fromWeb3] = pipedFromDuplexBuffer;
+            const [writeDuplex1, writeDuplex2, writeDuplex3] = writeBuffer;
+            const [readDuplex1, readDuplex2, readDuplex3] = readBuffer;
 
-            t.is(intoDuplex1, "POWER OVERWHELMING", "Written to the duplex, out into the web write stream.");
-            t.is(intoDuplex2, "I'D RATHER BE SAILING", "Written to the duplex, out into the web write stream.");
-            t.absent(intoDuplex3);
+            t.is(writeDuplex1, "POWER OVERWHELMING", "Written to the duplex, out into the web write stream.");
+            t.is(writeDuplex2, "I'D RATHER BE SAILING", "Written to the duplex, out into the web write stream.");
+            t.absent(writeDuplex3);
 
-            t.is(fromWeb1, "HELLO", "Read from the web stream and using mapReadable streamx option.");
-            t.is(fromWeb2, "WORLD", "Read from the web stream and using mapReadable streamx option.");
-            t.absent(fromWeb3);
+            t.is(readDuplex1, "HELLO", "Read from the web stream and using mapReadable streamx option.");
+            t.is(readDuplex2, "WORLD", "Read from the web stream and using mapReadable streamx option.");
+            t.absent(readDuplex3);
 
             t.is(ended, 1, "duplex end event was emitted")
             t.ok(streamDuplex.destroyed, "streamx destroyed properly");
