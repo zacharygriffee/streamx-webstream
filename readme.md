@@ -22,7 +22,7 @@ import {fromWeb} from "streamx-webstream/from";
 
 import {toWeb} from "streamx-webstream/to";
 
-// or CDN (and can tree shake that too)
+// or CDN (and can tree shake that too) 
 
 import {fromWeb, toWeb} from "https://esm.run/streamx-webstream";
 ```
@@ -33,7 +33,11 @@ import {fromWeb, toWeb} from "https://esm.run/streamx-webstream";
 Create a [Readable Stream (streamx API)](https://www.npmjs.com/package/streamx#readable-stream) from a
 [Readable Stream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream)
 
-options: [see options](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#readable-stream) 
+`options`: [see options](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#readable-stream)
+
+#### NEW
+
+In addition, if you supply a `write` function to the `options`, the return stream wil be a [duplex](https://www.npmjs.com/package/streamx#duplex-stream) stream, see the test.html for usage example.
 
 ```ecmascript 6
 import { fromWeb } from "streamx-webstream";
@@ -96,6 +100,8 @@ while(true) {
 
 console.log(buffered); // hello, world
 ```
+
+
 
 ### Roadmap
 

@@ -5,136 +5,212 @@
     <title>Test</title>
 </head>
 <body>
-    <script type="importmap">
+<script type="importmap">
         {
             "imports": {
                 "streamx": "https://esm.run/streamx",
                 "brittle": "https://esm.run/brittle",
-                "b4a": "https://esm.run/b4a"
+                "b4a": "https://esm.run/b4a",
+                "duplex-through": "https://esm.run/duplex-through"
             }
         }
-    </script>
-    <script type="module">
-        import {fromWeb, toWeb} from "./index.js";
-        import {Readable} from "streamx";
-        import {test, solo} from "brittle";
-        import b4a from "b4a";
 
-        test('streamx to web readable stream', async t => {
-            t.plan(7)
+</script>
+<script type="module">
+    import {fromWeb, toWeb} from "./index.js";
+    import {Readable, Writable} from "streamx";
+    import {test} from "brittle";
+    import b4a from "b4a";
 
-            const r = new Readable()
-            const buffered = []
-            let ended = 0
+    test('streamx to web readable stream', async t => {
+        t.plan(7)
 
-            r.push('hello')
-            r.push('world')
-            r.push(null)
+        const r = new Readable()
+        const buffered = []
+        let ended = 0
 
-            const webStreamReadable = toWeb(r);
-            const reader = webStreamReadable.getReader();
+        r.push('hello')
+        r.push('world')
+        r.push(null)
 
-            r.on("close", () => t.pass("closed", "Streamx closed successfully"));
-            r.on('end', () => ended++)
+        const webStreamReadable = toWeb(r);
+        const reader = webStreamReadable.getReader();
 
-            while(true) {
-                const {value, done} = await reader.read();
-                if (value) buffered.push(b4a.toString(value));
-                if (done) break;
+        r.on("close", () => t.pass("closed", "Streamx closed successfully"));
+        r.on('end', () => ended++)
+
+        while (true) {
+            const {value, done} = await reader.read();
+            if (value) buffered.push(b4a.toString(value));
+            if (done) break;
+        }
+
+        t.is(buffered[0] + buffered[1], "helloworld", "Received helloworld streamx->ReadableStream");
+        t.is(ended, 1, "streamx end event was emitted")
+        t.ok(r.destroyed, "streamx destroyed properly");
+
+        reader.closed.then(
+            () => t.pass("ReadableStream closed")
+        );
+
+        t.ok(webStreamReadable.locked, "ReadableStream has lock still");
+        reader.releaseLock();
+        t.absent(webStreamReadable.locked, "ReadableStream lock released");
+    });
+
+    test('web readable stream to streamx', async t => {
+        t.plan(6);
+        const webStreamReadable = new ReadableStream({
+            start(controller) {
+                controller.enqueue(b4a.from("hello"));
+                controller.enqueue(b4a.from("world"));
+                controller.close();
             }
+        });
 
-            t.is(buffered[0] + buffered[1], "helloworld", "Received helloworld streamx->ReadableStream");
+        const streamxReadable = fromWeb(webStreamReadable);
+        const buffered = [];
+        let ended = 0
+
+        streamxReadable.once('end', () => ended++)
+
+        streamxReadable.on("data", o => {
+            buffered.push(b4a.toString(o));
+        });
+
+        streamxReadable.once("close", async () => {
+            t.pass("closed", "Streamx closed successfully");
+            t.is(buffered[0] + buffered[1], "helloworld", "Received helloworld ReadableStream->streamx");
             t.is(ended, 1, "streamx end event was emitted")
-            t.ok(r.destroyed, "streamx destroyed properly");
-
-            reader.closed.then(
-                () => t.pass("ReadableStream closed")
-            );
-
-            t.ok(webStreamReadable.locked, "ReadableStream has lock still");
-            reader.releaseLock();
-            t.absent(webStreamReadable.locked, "ReadableStream lock released");
+            t.ok(streamxReadable.destroyed, "streamx destroyed properly");
+            t.ok(webStreamReadable.locked, "Web stream is still locked to instance, must be closed");
+            t.comment("streamx may have already closed by now but the webstream needs some cleanup")
+            await streamxReadable.close();
+            t.absent(webStreamReadable.locked, "Web stream closed.");
         });
+    });
 
-        test('web readable stream to streamx', async t => {
-            t.plan(6);
-            const webStreamReadable = new ReadableStream({
-                start(controller) {
-                    controller.enqueue(b4a.from("hello"));
-                    controller.enqueue(b4a.from("world"));
-                    controller.close();
-                }
-            });
-
-            const streamxReadable = fromWeb(webStreamReadable);
-            const buffered = [];
-            let ended = 0
-
-            streamxReadable.once('end', () => ended++)
-
-            streamxReadable.on("data", o => {
-                buffered.push(b4a.toString(o));
-            });
-
-            streamxReadable.once("close", async () => {
-                t.pass("closed", "Streamx closed successfully");
-                t.is(buffered[0] + buffered[1], "helloworld", "Received helloworld ReadableStream->streamx");
-                t.is(ended, 1, "streamx end event was emitted")
-                t.ok(streamxReadable.destroyed, "streamx destroyed properly");
-                t.ok(webStreamReadable.locked, "Web stream is still locked to instance, must be closed");
-                t.comment("streamx may have already closed by now but the webstream needs some cleanup")
-                await streamxReadable.close();
-                t.absent(webStreamReadable.locked, "Web stream closed.");
-            });
-        });
-
-        test('web readable stream to streamx with streamx options', async t => {
-            t.plan(6);
-            const webStreamReadable = new ReadableStream({
-                start(controller) {
-                    controller.enqueue(
-                        b4a.from(
-                            JSON.stringify({hello: "world"})
-                        )
-                    );
-
-                    controller.enqueue(
-                        b4a.from(
-                            JSON.stringify({foo: "bar"})
-                        )
-                    );
-
-                    controller.close();
-                }
-            });
-
-            const streamxReadable = fromWeb(webStreamReadable, {
-                map(o) {
-                    return JSON.parse(
-                        b4a.toString(o)
+    test('web readable stream to streamx with streamx options', async t => {
+        t.plan(8);
+        const webStreamReadable = new ReadableStream({
+            start(controller) {
+                controller.enqueue(
+                    b4a.from(
+                        JSON.stringify({hello: "world"})
                     )
-                }
-            });
-            const buffered = [];
-            let ended = 0
+                );
 
-            streamxReadable.once('end', () => ended++)
+                controller.enqueue(
+                    b4a.from(
+                        JSON.stringify({foo: "bar"})
+                    )
+                );
 
-            streamxReadable.on("data", o => {
-                buffered.push(o);
-            });
-
-            streamxReadable.once("close", async () => {
-                t.pass("closed", "Streamx closed successfully");
-                t.is(buffered[0].hello + buffered[1].foo, "worldbar", "Received worldbar ReadableStream->streamx");
-                t.is(ended, 1, "streamx end event was emitted")
-                t.ok(streamxReadable.destroyed, "streamx destroyed properly");
-                t.ok(webStreamReadable.locked, "Web stream is still locked to instance, must be closed");
-                t.comment("streamx may have already closed by now but the webstream needs some cleanup")
-                await streamxReadable.close();
-                t.absent(webStreamReadable.locked, "Web stream closed.");
-            });
+                controller.close();
+            }
         });
-    </script>
+
+        const streamxReadable = fromWeb(webStreamReadable, {
+            map(o) {
+                return JSON.parse(
+                    b4a.toString(o)
+                )
+            }
+        });
+        const buffered = [];
+        let ended = 0
+
+        streamxReadable.once('end', () => ended++)
+
+        streamxReadable.on("data", o => {
+            buffered.push(o);
+        });
+
+        streamxReadable.once("close", async () => {
+            t.pass("closed", "Streamx closed successfully");
+            t.is(buffered[0].hello + buffered[1].foo, "worldbar", "Received worldbar ReadableStream->streamx");
+            t.is(ended, 1, "streamx end event was emitted")
+            t.ok(streamxReadable.destroyed, "streamx destroyed properly");
+            t.ok(webStreamReadable.locked, "Web stream is still locked to instance, must be closed");
+            t.comment("streamx may have already closed by now but the webstream needs some cleanup")
+            await streamxReadable.close();
+            t.absent(webStreamReadable.locked, "Web stream closed.");
+        });
+    });
+
+    test('fromWeb: streamx duplex mode', async t => {
+        t.plan(10);
+        let ended = 0;
+
+        const pipedFromDuplexBuffer = [];
+        const writtenIntoDuplexBuffer = [];
+
+        const webStreamReadable = new ReadableStream({
+            start(controller) {
+                 controller.enqueue("hello");
+                controller.enqueue("world");
+                controller.close();
+            }
+        });
+
+        const webStreamWritable = new WritableStream({
+            write(val) {
+                pipedFromDuplexBuffer.push(val);
+            }
+        });
+
+        const writer = webStreamWritable.getWriter();
+
+        const streamDuplex = fromWeb(webStreamReadable, {
+            // Adding this 'write' function turns it into duplex.
+            write(val, cb) {
+                writtenIntoDuplexBuffer.push(val);
+                cb();
+            },
+            // you can then use streamx mapper function for the respective direction
+            mapWritable(val) {
+                return val.toUpperCase();
+            },
+            mapReadable(val) {
+                return val.toUpperCase();
+            }
+        });
+
+        const writable = new Writable({
+            write(val, cb) {
+                writer.write(val);
+                cb();
+            }
+        });
+
+        streamDuplex.pipe(writable);
+        streamDuplex.write("power overwhelming");
+        streamDuplex.write("I'd rather be sailing");
+        // This will unlock the underlying webstream
+        streamDuplex.end();
+
+        streamDuplex.once("end", () => ended++);
+        streamDuplex.once("close", async () => {
+            const [intoDuplex1, intoDuplex2, intoDuplex3] = writtenIntoDuplexBuffer;
+            const [fromWeb1, fromWeb2, fromWeb3] = pipedFromDuplexBuffer;
+
+            t.is(intoDuplex1, "POWER OVERWHELMING", "Written to the duplex, out into the web write stream.");
+            t.is(intoDuplex2, "I'D RATHER BE SAILING", "Written to the duplex, out into the web write stream.");
+            t.absent(intoDuplex3);
+
+            t.is(fromWeb1, "HELLO", "Read from the web stream and using mapReadable streamx option.");
+            t.is(fromWeb2, "WORLD", "Read from the web stream and using mapReadable streamx option.");
+            t.absent(fromWeb3);
+
+            t.is(ended, 1, "duplex end event was emitted")
+            t.ok(streamDuplex.destroyed, "streamx destroyed properly");
+            t.ok(webStreamReadable.locked, "Web stream is still locked to instance, must be closed");
+            t.comment("streamx may have already closed by now but the webstream needs some cleanup");
+
+            await streamDuplex.close();
+            t.absent(webStreamReadable.locked, "Web stream closed.");
+        });
+    });
+</script>
 </body>
 </html>
