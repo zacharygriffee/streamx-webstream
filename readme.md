@@ -58,7 +58,10 @@ const readableStreamX = fromWeb(readableWebStream, {
     // Add whatever streamx options you want.
     map(buffer) {
         return b4a.toString(buffer);
-    }
+    },
+    //write(value, cb) {
+    // Adding a write function turns the returned stream into a duplex. 
+    //}
 });
 
 readableStreamX.on("data", string => {
