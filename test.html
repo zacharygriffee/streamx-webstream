@@ -186,7 +186,6 @@
         streamDuplex.pipe(writable);
         streamDuplex.write("power overwhelming");
         streamDuplex.write("I'd rather be sailing");
-        // This will unlock the underlying webstream
         streamDuplex.end();
 
         streamDuplex.once("end", () => ended++);
