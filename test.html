@@ -91,7 +91,7 @@
     });
 
     test('web readable stream to streamx with streamx options', async t => {
-        t.plan(8);
+        t.plan(6);
         const webStreamReadable = new ReadableStream({
             start(controller) {
                 controller.enqueue(
