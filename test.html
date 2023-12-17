@@ -155,35 +155,47 @@
 
         const webStreamWritable = new WritableStream({
             write(val) {
+                // ReadableStream (web) -> Duplex (readable streamx) -> Writable (writable streamx) -> WritableStream (web)
                 readBuffer.push(val);
             }
         });
-
+        
         const writer = webStreamWritable.getWriter();
 
         const streamDuplex = fromWeb(webStreamReadable, {
             // Adding this 'write' function turns it into duplex.
             write(val, cb) {
+                // this receives the 'power overwhelming' and 'i'd rather be sailing'
+                // strings from below.
                 writeBuffer.push(val);
                 cb();
             },
             // you can then use streamx mapper function for the respective direction
             mapWritable(val) {
+                // this capitalizes the 'power overwhelming' and 'i'd rather be sailing'
                 return val.toUpperCase();
             },
             mapReadable(val) {
+                // this capitalizes the 'hello' and 'world' from web api readable.
                 return val.toUpperCase();
             }
         });
 
+        // We pipe the readable part of duplex into this writable to test
+        // that piping operations works.
         const writable = new Writable({
-            write(val, cb) {
+            write(val, cb) 
                 writer.write(val);
                 cb();
             }
         });
 
+        // The 'readable' part of the duplex is piped to the 'writable streamx' (above this line)
+        // Which then gets piped into the writable web stream.
         streamDuplex.pipe(writable);
+
+        // This writes to the duplex (writable streamx) which
+        // does not interact with the readable part of the duplex
         streamDuplex.write("power overwhelming");
         streamDuplex.write("I'd rather be sailing");
         streamDuplex.end();
@@ -193,8 +205,8 @@
             const [writeDuplex1, writeDuplex2, writeDuplex3] = writeBuffer;
             const [readDuplex1, readDuplex2, readDuplex3] = readBuffer;
 
-            t.is(writeDuplex1, "POWER OVERWHELMING", "Written to the duplex, out into the web write stream.");
-            t.is(writeDuplex2, "I'D RATHER BE SAILING", "Written to the duplex, out into the web write stream.");
+            t.is(writeDuplex1, "POWER OVERWHELMING", "Written to the duplex");
+            t.is(writeDuplex2, "I'D RATHER BE SAILING", "Written to the duplex.");
             t.absent(writeDuplex3);
 
             t.is(readDuplex1, "HELLO", "Read from the web stream and using mapReadable streamx option.");
