@@ -86,7 +86,7 @@
             t.ok(webStreamReadable.locked, "Web stream is still locked to instance, must be closed");
             t.comment("streamx may have already closed by now but the webstream needs some cleanup")
             await streamxReadable.close();
-            t.absent(webStreamReadable.locked, "Web stream closed.");
+            t.absent(webStreamReadable.locked, "Web stream unlocked.");
         });
     });
 
@@ -134,7 +134,7 @@
             t.ok(webStreamReadable.locked, "Web stream is still locked to instance, must be closed");
             t.comment("streamx may have already closed by now but the webstream needs some cleanup")
             await streamxReadable.close();
-            t.absent(webStreamReadable.locked, "Web stream closed.");
+            t.absent(webStreamReadable.locked, "Web stream unlocked.");
         });
     });
 
@@ -207,7 +207,7 @@
             t.comment("streamx may have already closed by now but the webstream needs some cleanup");
 
             await streamDuplex.close();
-            t.absent(webStreamReadable.locked, "Web stream closed.");
+            t.absent(webStreamReadable.locked, "Web stream unlocked.");
         });
     });
 </script>
