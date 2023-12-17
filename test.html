@@ -184,7 +184,7 @@
         // We pipe the readable part of duplex into this writable to test
         // that piping operations works.
         const writable = new Writable({
-            write(val, cb) 
+            write(val, cb) {
                 writer.write(val);
                 cb();
             }
