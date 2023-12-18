@@ -10,7 +10,8 @@
             "imports": {
                 "streamx": "https://esm.run/streamx",
                 "brittle": "https://esm.run/brittle",
-                "b4a": "https://esm.run/b4a"
+                "b4a": "https://esm.run/b4a",
+                "framed-stream": "https://esm.run/framed-stream"
             }
         }
 
@@ -19,9 +20,10 @@
 </script>
 <script type="module">
     import {fromWeb, toWeb} from "./index.js";
-    import {Readable, Writable, Duplex} from "streamx";
-    import {test} from "brittle";
+    import {Readable, Writable, Duplex, Transform} from "streamx";
+    import {test, solo} from "brittle";
     import b4a from "b4a";
+    import FramedStream from "framed-stream";
 
     test('streamx to web readable stream', async t => {
         t.plan(7)
@@ -467,6 +469,53 @@
         })();
 
         t.teardown(() => writableX.end());
+    });
+
+    test("fromWeb asTransform", async t => {
+        t.plan(3);
+        let ended = 0;
+        const readBuffer = [];
+        const writeBuffer = [];
+
+        // We still can have our readable part piped out to the writable
+        const webStreamReadable = new ReadableStream({
+            start(controller) {
+                controller.enqueue("Green");
+                controller.enqueue("Tea");
+                controller.enqueue("Shot");
+                controller.close();
+            }
+        });
+
+        const webStreamWritable = new WritableStream({
+            write(val) {
+                if (val) writeBuffer.push(val);
+            }
+        });
+
+        const transform = fromWeb(webStreamReadable, {write: webStreamWritable, asTransform: true});
+
+        transform.on("finish", () => {
+            t.is(writeBuffer.join(","), "Jameson Whiskey,Peach Schnapps,Sour,Sprite", "Make a green tea shot");
+        });
+
+        transform.on("close", () => {
+            t.is(readBuffer.join(","), "Green,Tea,Shot", "Shake it or stir it. You could serve it on ice, or just shoot it.");
+            t.ok(ended === 1, "ended");
+        });
+
+        transform.on("data", (val) => {
+            readBuffer.push(val);
+        });
+
+        transform.once("end", () => ended++);
+
+        transform.write("Jameson Whiskey");
+        transform.write("Peach Schnapps")
+        transform.write("Sour");
+        transform.write("Sprite");
+        await Writable.drained(transform);
+        transform.end();
     });
 
 </script>

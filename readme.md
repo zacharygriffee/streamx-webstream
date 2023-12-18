@@ -4,13 +4,13 @@ A toWeb/fromWeb wrapper for [streamx streams](https://github.com/mafintosh/strea
 
 Object mode not supported.
 
-### Installation
+## Installation
 
 ```sh
 npm install streamx-webstream --save
 ```
 
-### Import
+## Import
 ```ecmascript 6
 import {fromWeb, toWeb} from "streamx-webstream";
 
@@ -28,8 +28,7 @@ import {fromWeb, toWeb} from "https://esm.run/streamx-webstream";
 ```
 
 
-### streamx.Readable | streamx.Duplex = fromWeb(webStream, [options])
-
+## `fromWeb(webStream, [options])`
 
 `options.write`
 
@@ -37,9 +36,14 @@ import {fromWeb, toWeb} from "https://esm.run/streamx-webstream";
 - Pass to the write option an unlocked[ WritableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream) and the [streamx.duplex](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#duplex-stream) will proxy writes to the [WritableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream) 
 - Don't pass write option and the stream will be just a [streamx.Readable](https://github.com/mafintosh/streamx#readable-stream)
 
+`options.asTransform`
+
+If set to true, in all cases where a duplex would be made via `options.write` will be a transform instead.
+
 For all other `options`: [see options](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#readable-stream)
 
-#### fromWeb readable example:
+
+### fromWeb readable example:
 
 ```ecmascript 6
 import { fromWeb } from "streamx-webstream";
@@ -80,7 +84,7 @@ readableStreamX.once("close", () => {
 await readableStreamX.close(); 
 ```
 
-### [ReadableStream](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream) | { [readable](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream), [writable](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream) } = toWeb(streamxReadableOrObject)
+## `toWeb(streamxReadableOrObject)`
 
 `streamxReadableOrObject`
 
@@ -88,7 +92,7 @@ await readableStreamX.close();
 - Pass an object with the following options:
   - `readable`: [streamx.Readable](https://github.com/mafintosh/streamx#readable-stream) 
   - `writable`: [streamx.Writable](https://github.com/mafintosh/streamx#readable-stream)
-  - `duplex`: [streamx.Duplex](https://github.com/mafintosh/streamx#duplex-stream) - Will be ignored if either `readable` or `writable` option is defined.
+  - `duplex`: [streamx.Duplex](https://github.com/mafintosh/streamx#duplex-stream) - Will be ignored if either `readable` or `writable` option is defined. You could also pass a [streamx.Transform](https://github.com/mafintosh/streamx#transform-stream) here.
 
 `returns`
 
