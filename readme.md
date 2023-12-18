@@ -28,16 +28,18 @@ import {fromWeb, toWeb} from "https://esm.run/streamx-webstream";
 ```
 
 
-### fromWeb(webStream, [options])
+### streamx.Readable | streamx.Duplex = fromWeb(webStream, [options])
 
 Create a [Readable Stream (streamx API)](https://www.npmjs.com/package/streamx#readable-stream) from a
 [Readable Stream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream)
 
-`options`: [see options](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#readable-stream)
+##### options.write
 
-#### NEW
+- Pass a [write function](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#ws_writedata-callback) to become a [streamx.duplex](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#duplex-stream).
+- Pass to the write function an unlocked[ WritableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream) and the [streamx.duplex](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#duplex-stream) will proxy writes to the [WritableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream) 
+- Don't pass write option and the stream will be just a streamx.Readable
 
-In addition, if you supply a `write` function to the `options`, the return stream wil be a [duplex](https://www.npmjs.com/package/streamx#duplex-stream) stream, see the test.html for usage example.
+For all other `options`: [see options](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#readable-stream)
 
 ```ecmascript 6
 import { fromWeb } from "streamx-webstream";
@@ -78,7 +80,7 @@ readableStreamX.once("close", () => {
 await readableStreamX.close(); 
 ```
 
-### toWeb(streamx)
+### ReadableStream = toWeb(streamx)
 
 Create a [Readable Stream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream) from [Readable Stream (streamx API)](https://www.npmjs.com/package/streamx#readable-stream).
 ```ecmascript 6
@@ -103,8 +105,6 @@ while(true) {
 
 console.log(buffered); // hello, world
 ```
-
-
 
 ### Roadmap
 
