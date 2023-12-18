@@ -225,7 +225,7 @@
     });
 
     test('fromWeb: streamx duplex mode passing a writable stream to the write function', async t => {
-        t.plan(12);
+        t.plan(11);
         let ended = 0;
         const buffer = [];
 
@@ -311,8 +311,164 @@
             t.absent(webStreamReadable.locked, "Readable stream unlocked.");
             t.absent(webStreamWritable.locked, "Writable stream unlocked.");
         });
-
     });
+
+    test('toWeb: get a readable and writable from pair of streamx entries', async t => {
+        t.plan(9);
+        const readBuffer = ["roses", "are", "red"];
+        const verifyReadBuffer = [...readBuffer];
+        const writeBuffer = ["violets", "are", "blue"];
+        const verifyWriteBuffer = [...writeBuffer];
+        // Create a streamx.Duplex to 'convert' into a readable and writable stream (WebAPI)
+        const duplex = new Duplex({
+            read(cb) {
+                const data = readBuffer.shift();
+                if (data) this.push(data);
+                if (!readBuffer.length) this.push(null);
+                cb();
+            },
+            write(data, cb) {
+                if (writeI > 3) t.fail("Write should only happen three times.");
+                const val = verifyWriteBuffer[writeI++];
+                t.is(val, b4a.toString(data));
+                cb();
+            }
+        });
+
+        let writeI = 0;
+
+        const {readable, writable} = toWeb({duplex});
+
+        const writer = writable.getWriter();
+
+        (async () => {
+            await writer.write(writeBuffer.shift());
+            await writer.write(writeBuffer.shift());
+            await writer.write(writeBuffer.shift());
+
+            writer.releaseLock();
+            t.absent(duplex.destroyed, "developer responsibility to close the underlying duplex");
+        })();
+
+        const reader = readable.getReader();
+
+        (async () => {
+            let readi = 0;
+            while(true) {
+                const {done, value} = await reader.read();
+                if (value) t.is(verifyReadBuffer[readi++], b4a.toString(value));
+                if (done) {
+                    t.pass("done happens");
+                    break;
+                }
+
+                if (readi > 3) t.fail("read should only happen three times");
+            }
+
+            reader.releaseLock();
+            t.absent(duplex.destroyed, "developer responsibility to close the underlying duplex");
+        })();
+
+        t.teardown(() => duplex.end());
+    });
+
+    test('toWeb: writable web api', async t => {
+        t.plan(4);
+        const writeBuffer = ["violets", "are", "blue"];
+        const verifyWriteBuffer = [...writeBuffer];
+        // Create a streamx.Duplex to 'convert' into a writable stream (WebAPI)
+        // Readable is not used at all.
+        const duplex = new Duplex({
+            write(data, cb) {
+                if (writeI > 3) t.fail("Write should only happen three times.");
+                const val = verifyWriteBuffer[writeI++];
+                t.is(val, b4a.toString(data));
+                cb();
+            }
+        });
+
+        let writeI = 0;
+
+        const writable = toWeb({writable: duplex});
+
+        const writer = writable.getWriter();
+
+        (async () => {
+            await writer.write(writeBuffer.shift());
+            await writer.write(writeBuffer.shift());
+            await writer.write(writeBuffer.shift());
+
+            writer.releaseLock();
+            t.absent(duplex.destroyed, "developer responsibility to close the underlying duplex");
+        })();
+
+        t.teardown(() => duplex.end());
+    });
+
+    test('toWeb: Different streamx for readable and writable', async t => {
+        t.plan(11);
+        const readBuffer = ["roses", "are", "red"];
+        const verifyReadBuffer = [...readBuffer];
+        const writeBuffer = ["violets", "are", "blue"];
+        const verifyWriteBuffer = [...writeBuffer];
+        // Create a streamx.Readable and streamx.Writable to 'convert' into a readable and writable stream (WebAPI)
+        const readableX = new Readable({
+            read(cb) {
+                const data = readBuffer.shift();
+                if (data) this.push(data);
+                if (!readBuffer.length) this.push(null);
+                cb();
+            }
+        });
+
+        const writableX = new Writable({
+            write(data, cb) {
+                if (writeI > 3) t.fail("Write should only happen three times.");
+                const val = verifyWriteBuffer[writeI++];
+                t.is(val, b4a.toString(data));
+                cb();
+            }
+        })
+
+        let writeI = 0;
+
+        const {readable, writable} = toWeb({readable: readableX, writable: writableX});
+
+        const writer = writable.getWriter();
+
+        (async () => {
+            await writer.write(writeBuffer.shift());
+            await writer.write(writeBuffer.shift());
+            await writer.write(writeBuffer.shift());
+
+            writer.releaseLock();
+            t.ok(readableX.destroyed, "readable closes itself due to null push");
+            t.absent(writableX.destroyed, "writable streamx will need ended.");
+        })();
+
+        const reader = readable.getReader();
+
+        (async () => {
+            let readi = 0;
+            while(true) {
+                const {done, value} = await reader.read();
+                if (value) t.is(verifyReadBuffer[readi++], b4a.toString(value));
+                if (done) {
+                    t.pass("done happens");
+                    break;
+                }
+
+                if (readi > 3) t.fail("read should only happen three times");
+            }
+
+            reader.releaseLock();
+            t.ok(readableX.destroyed, "readable closes itself due to null push");
+            t.absent(writableX.destroyed, "writable streamx will need ended.");
+        })();
+
+        t.teardown(() => writableX.end());
+    });
+
 </script>
 </body>
 </html>

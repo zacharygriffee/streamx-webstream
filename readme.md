@@ -30,16 +30,16 @@ import {fromWeb, toWeb} from "https://esm.run/streamx-webstream";
 
 ### streamx.Readable | streamx.Duplex = fromWeb(webStream, [options])
 
-Create a [Readable Stream (streamx API)](https://www.npmjs.com/package/streamx#readable-stream) from a
-[Readable Stream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream)
 
-##### options.write
+`options.write`
 
 - Pass to the write option a [function](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#ws_writedata-callback) to become a [streamx.duplex](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#duplex-stream).
 - Pass to the write option an unlocked[ WritableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream) and the [streamx.duplex](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#duplex-stream) will proxy writes to the [WritableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream) 
-- Don't pass write option and the stream will be just a streamx.Readable
+- Don't pass write option and the stream will be just a [streamx.Readable](https://github.com/mafintosh/streamx#readable-stream)
 
 For all other `options`: [see options](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#readable-stream)
+
+#### fromWeb readable example:
 
 ```ecmascript 6
 import { fromWeb } from "streamx-webstream";
@@ -80,9 +80,24 @@ readableStreamX.once("close", () => {
 await readableStreamX.close(); 
 ```
 
-### ReadableStream = toWeb(streamx)
+### [ReadableStream](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream) | { [readable](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream), [writable](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream) } = toWeb(streamxReadableOrObject)
 
-Create a [Readable Stream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream) from [Readable Stream (streamx API)](https://www.npmjs.com/package/streamx#readable-stream).
+`streamxReadableOrObject`
+
+- Pass a [streamx.Readable](https://github.com/mafintosh/streamx#readable-stream) and get a [ReadableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream)
+- Pass an object with the following options:
+  - `readable`: [streamx.Readable](https://github.com/mafintosh/streamx#readable-stream) 
+  - `writable`: [streamx.Writable](https://github.com/mafintosh/streamx#readable-stream)
+  - `duplex`: [streamx.Duplex](https://github.com/mafintosh/streamx#duplex-stream) - Will be ignored if either `readable` or `writable` option is defined.
+
+`returns`
+
+- If a [streamx.Duplex](https://github.com/mafintosh/streamx#duplex-stream) OR a pair streamx.Readable and streamx.Writable is supplied will return an object with WebAPI counterparts in this format: { readable, writable }
+- If a [streamx.Readable](https://github.com/mafintosh/streamx#readable-stream) is supplied by itself, will return [ReadableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream).
+- If a [streamx.Writable](https://github.com/mafintosh/streamx#writable-stream) is suppled by itself, will return [WritableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream).
+
+#### toWeb Simple readable example:
+
 ```ecmascript 6
 import { toWeb } from "streamx-webstream";
 import { Readable } from "streamx";
@@ -106,6 +121,40 @@ while(true) {
 console.log(buffered); // hello, world
 ```
 
+#### toWeb Duplex example:
+
+```ecmascript 6
+const duplex = new Duplex({
+    read(cb) {
+        // read logic
+    },
+    write(data, cb) {
+        // write logic
+    }
+});
+
+const {readable, writable} = toWeb({duplex});
+
+// Do webApi stuff with the readable and writable.
+const writer = writable.getWriter();
+const reader = readable.getReader();
+```
+
+#### toWeb Just write example:
+
+```ecmascript 6
+const duplex = new Duplex({
+    write(data, cb) {
+        // write logic
+    }
+});
+
+const writable = toWeb({writable: duplex});
+
+// Do webApi stuff with the writable.
+const writer = writable.getWriter();
+```
+
 ### Roadmap
 
 - Support object mode maybe
@@ -113,6 +162,8 @@ console.log(buffered); // hello, world
 ## Test
 
 Run test.html with a web server.
+
+If you're looking for performance time, test the html file without debugger tools open wait 10 seconds then open.
 
 ## License
 
