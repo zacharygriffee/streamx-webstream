@@ -11,9 +11,14 @@
                 "streamx": "https://esm.run/streamx",
                 "brittle": "https://esm.run/brittle",
                 "b4a": "https://esm.run/b4a",
-                "framed-stream": "https://esm.run/framed-stream"
+                "framed-stream": "https://esm.run/framed-stream",
+                "duplex-through": "https://esm.run/duplex-through",
+                "xache": "https://esm.run/xache",
+                "protomux": "https://esm.run/protomux",
+                "compact-encoding": "https://esm.run/compact-encoding"
             }
         }
+
 
 
 
@@ -24,6 +29,9 @@
     import {test, solo} from "brittle";
     import b4a from "b4a";
     import FramedStream from "framed-stream";
+    import duplexThrough from "duplex-through";
+    import Protomux from "protomux";
+    import cenc from "compact-encoding";
 
     test('streamx to web readable stream', async t => {
         t.plan(7)
@@ -356,7 +364,7 @@
 
         (async () => {
             let readi = 0;
-            while(true) {
+            while (true) {
                 const {done, value} = await reader.read();
                 if (value) t.is(verifyReadBuffer[readi++], b4a.toString(value));
                 if (done) {
@@ -452,7 +460,7 @@
 
         (async () => {
             let readi = 0;
-            while(true) {
+            while (true) {
                 const {done, value} = await reader.read();
                 if (value) t.is(verifyReadBuffer[readi++], b4a.toString(value));
                 if (done) {
@@ -516,6 +524,130 @@
         transform.write("Sprite");
         await Writable.drained(transform);
         transform.end();
+    });
+
+    test("transform toWeb to fromWeb... in essence the product of fromWeb will be a clone of what was passed into toWeb.", async t => {
+        t.plan(4);
+        t.comment("toWeb(streamx.transform) -> {WritableStream, ReadableStream} -> fromWeb(streamx.transform)");
+        const transform = new Transform();
+        const {readable, writable} = toWeb({duplex: transform});
+        const transformClone = fromWeb(readable, {write: writable, asTransform: true});
+
+        _firstData(transform);
+        _firstData(transformClone);
+
+        transform.write(b4a.from("hello world from original"));
+        transformClone.write(b4a.from("hello world from clone"));
+
+        function _firstData(dup) {
+            dup.once("data", data => {
+                const str = b4a.toString(data);
+                t.is(str, "hello world from original");
+                _secondData(dup)
+            });
+        }
+
+        function _secondData(dup) {
+            dup.once("data", data => {
+                const str = b4a.toString(data);
+                t.is(str, "hello world from clone");
+            });
+        }
+    });
+
+    test("duplex toWeb to fromWeb....", async t => {
+        t.plan(2);
+        t.comment("toWeb(streamx.duplex) -> {WritableStream, ReadableStream} -> fromWeb(streamx.duplex)");
+        const duplex = new Duplex();
+        const {readable, writable} = toWeb({duplex: duplex});
+        const duplex2 = fromWeb(readable, {write: writable});
+
+        duplex.on("data", o => {
+            const str = b4a.toString(o);
+            t.is(str, "hello world from original");
+        });
+
+        duplex2.on("data", o => {
+            const str = b4a.toString(o);
+            t.is(str, "hello world from original");
+        });
+
+        duplex.push(b4a.from("hello world from original"));
+
+        t.teardown(() => {
+            duplex.destroy();
+            duplex2.destroy();
+        })
+    });
+
+    test("Test with framed stream, protomux, and channels for potential inter-webworker comm", async t => {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        t.plan(4);
+
+        // Simulate server/client;
+        const [localDuplex, remoteDuplex] = duplexThrough();
+
+        (async () => {
+            // Setup local
+            const framedLocal = new FramedStream(localDuplex)
+
+            // The localReadable and localWritable would be transferred to the remote side.
+            // e.g. postMessage(localWritable, [localWritable]);
+            const {readable: localReadable, writable: localWritable} = toWeb({duplex: framedLocal});
+            const duplexFromLocal = fromWeb(localReadable, {write: localWritable});
+            const muxLocal = new Protomux(duplexFromLocal);
+
+            const channelLocal = muxLocal.createChannel({
+                protocol: "debuggertesters",
+                handshake: cenc.string,
+                onopen(arg) {
+                    t.is(arg, "from remote");
+                    console.log("local got open", arg)
+                    channelLocal.close();
+                },
+                onclose() {
+                    t.pass();
+                }
+            });
+
+            channelLocal.open("from local");
+
+            t.teardown(async () => {
+                await localDuplex.end();
+            });
+        })();
+
+        // This is the boundary where the stream would cross over to web worker or iframe.
+
+        (async () => {
+            // Setup remote
+            const framedRemote = new FramedStream(remoteDuplex);
+
+            // The remoteReadable and remoteWritable would be transferred to the local side.
+            // e.g. postMessage(remoteWritable, [remoteWritable]);
+            const {readable: remoteReadable, writable: remoteWritable} = toWeb({duplex: framedRemote});
+            const duplexFromRemote = fromWeb(remoteReadable, {write: remoteWritable});
+            const muxRemote = new Protomux(duplexFromRemote);
+
+            const channelRemote = muxRemote.createChannel({
+                protocol: "debuggertesters",
+                handshake: cenc.string,
+                onopen(arg) {
+                    t.is(arg, "from local");
+                    console.log("remote got open", arg)
+                    channelRemote.close();
+                },
+                onclose() {
+                    t.pass();
+                }
+            });
+
+            channelRemote.open("from remote");
+
+            t.teardown(async () => {
+                await remoteDuplex.end();
+            });
+        })();
     });
 
 </script>
