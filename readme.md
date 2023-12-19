@@ -28,11 +28,11 @@ import {fromWeb, toWeb} from "https://esm.run/streamx-webstream";
 ```
 
 
-## `fromWeb(webStream, [options])`
+## `fromWeb(webReadableStream, [options])`
 
 `options.write`
 
-- Pass to the write option a [function](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#ws_writedata-callback) to become a [streamx.duplex](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#duplex-stream).
+- Pass to the write option a [write function](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#ws_writedata-callback) to become a [streamx.duplex](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#duplex-stream).
 - Pass to the write option an unlocked[ WritableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream) and the [streamx.duplex](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#duplex-stream) will proxy writes to the [WritableStream (WebAPI)](https://developer.mozilla.org/en-US/docs/Web/API/WritableStream) 
 - Don't pass write option and the stream will be just a [streamx.Readable](https://github.com/mafintosh/streamx#readable-stream)
 
@@ -42,6 +42,12 @@ If set to true, in all cases where a duplex would be made via `options.write` wi
 
 For all other `options`: [see options](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#readable-stream)
 
+
+## `fromWeb({readable, writable}, [options])`
+
+An alternative syntax of fromWeb. When `writable` is supplied, the `options.write` is ignored.
+
+Writable can also be a [write function](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#ws_writedata-callback).
 
 ### fromWeb readable example:
 
