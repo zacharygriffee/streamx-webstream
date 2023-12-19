@@ -581,10 +581,9 @@
     });
 
     test("Test with framed stream, protomux, and channels for potential inter-webworker comm", async t => {
-        await new Promise(resolve => setTimeout(resolve, 2000));
         t.plan(4);
 
-        // Simulate server/client;
+        // Simulate a local duplex (main thread / main web worker) and remote (web worker/nested web worker/iframe);
         const [localDuplex, remoteDuplex] = duplexThrough();
 
         (async () => {
