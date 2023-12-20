@@ -30,6 +30,8 @@ import {fromWeb, toWeb} from "https://esm.run/streamx-webstream";
 
 ## `fromWeb(webReadableStream, [options])`
 
+* writev not supported at the moment
+
 `options.write`
 
 - Pass to the write option a [write function](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#ws_writedata-callback) to become a [streamx.duplex](https://github.com/mafintosh/streamx/tree/master?tab=readme-ov-file#duplex-stream).
@@ -91,6 +93,8 @@ await readableStreamX.close();
 ```
 
 ## `toWeb(streamxReadableOrObject)`
+
+* writev not supported at the moment
 
 `streamxReadableOrObject`
 
@@ -164,10 +168,6 @@ const writable = toWeb({writable: duplex});
 // Do webApi stuff with the writable.
 const writer = writable.getWriter();
 ```
-
-### Roadmap
-
-- Support object mode maybe
 
 ## Test
 
