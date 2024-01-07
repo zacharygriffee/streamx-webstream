@@ -4,6 +4,14 @@ A toWeb/fromWeb wrapper for [streamx streams](https://github.com/mafintosh/strea
 
 Object mode not supported.
 
+---
+
+### Support the cause towards decentralization
+
+bitcoin: bc1q9fpu6muvmg5fj76pyzg3ffjrmksnvfj3c0xva6
+
+---
+
 ## Installation
 
 ```sh
