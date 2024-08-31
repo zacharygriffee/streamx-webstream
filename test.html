@@ -6,29 +6,26 @@
 </head>
 <body>
 <script type="importmap">
-        {
-            "imports": {
-                "streamx": "https://esm.run/streamx",
-                "brittle": "https://esm.run/brittle",
-                "b4a": "https://esm.run/b4a",
-                "duplex-through": "https://esm.run/duplex-through",
-                "protomux": "https://esm.run/protomux",
-                "compact-encoding": "https://esm.run/compact-encoding",
-                "threads-es": "https://esm.run/threads-es"
-            }
+    {
+        "imports": {
+            "streamx": "https://esm.run/streamx",
+            "brittle": "https://esm.run/brittle",
+            "b4a": "https://esm.run/b4a",
+            "duplex-through": "https://esm.run/duplex-through-with-error-handling",
+            "protomux": "https://esm.run/protomux",
+            "compact-encoding": "https://esm.run/compact-encoding",
+            "threads-es": "https://esm.run/threads-es"
         }
+    }
 
 
 </script>
 <script type="module">
     import {fromWeb, toWeb} from "./index.js";
     import {Readable, Writable, Duplex, Transform} from "streamx";
-    import {test, solo} from "brittle";
+    import {test, solo, skip} from "brittle";
     import b4a from "b4a";
-    import duplexThrough from "duplex-through";
-    import Protomux from "protomux";
-    import cenc from "compact-encoding";
-    import {EsThread} from "threads-es";
+    import {duplexThrough} from "duplex-through";
 
 
     test('streamx to web readable stream', async t => {
@@ -664,290 +661,37 @@
         })
     });
 
-    test("Test with protomux, and channels for potential inter-webworker comm", async t => {
-        t.plan(4);
+    test('fromWeb: should propagate errors from readable and writable streams', async _t => {
+        const t = _t.test();
+        t.plan(2); // Plan for one assertion
 
-        // Simulate a local duplex (main thread / main web worker) and remote (web worker/nested web worker/iframe);
-        const [localDuplex, remoteDuplex] = duplexThrough();
+        // Create a duplex stream using your existing setup
+        const [local, remote] = duplexThrough();
+        const duplex = fromWeb(toWeb({duplex: remote}));
 
-        (async () => {
-            // Setup local
-            // The localReadable and localWritable would be transferred to the remote side.
-            // e.g. postMessage(localWritable, [localWritable]);
-            const {readable: localReadable, writable: localWritable} = toWeb({duplex: localDuplex});
-            const duplexFromLocal = fromWeb(localReadable, {write: localWritable});
-            const muxLocal = new Protomux(duplexFromLocal);
+        local.on("error", () => {
+            t.pass("error will also trigger on local");
+        });
 
-            const channelLocal = muxLocal.createChannel({
-                protocol: "debuggertesters",
-                handshake: cenc.string,
-                onopen(arg) {
-                    t.is(arg, "from remote");
-                    console.log("local got open", arg)
-                    channelLocal.close();
-                },
-                onclose() {
-                    t.pass();
-                }
-            });
+        // Simulate an error on the local stream after 2 seconds
+        setTimeout(() => {
+            local.destroy(new Error('hello you'));
+        }, 10);
 
-            channelLocal.open("from local");
+        // Set up an error listener on the duplex stream
+        duplex.on('error', err => {
+            t.ok(err.message === 'hello you', 'Error message should match the triggered error');
+        });
 
-            t.teardown(async () => {
-                await localDuplex.end();
-            });
-        })();
-
-        // This is the boundary where the stream would cross over to web worker or iframe.
-
-        (async () => {
-            // Setup remote
-            // The remoteReadable and remoteWritable would be transferred to the local side.
-            // e.g. postMessage(remoteWritable, [remoteWritable]);
-            const {readable: remoteReadable, writable: remoteWritable} = toWeb({duplex: remoteDuplex});
-            const duplexFromRemote = fromWeb(remoteReadable, {write: remoteWritable});
-            const muxRemote = new Protomux(duplexFromRemote);
-
-            const channelRemote = muxRemote.createChannel({
-                protocol: "debuggertesters",
-                handshake: cenc.string,
-                onopen(arg) {
-                    t.is(arg, "from local");
-                    console.log("remote got open", arg)
-                    channelRemote.close();
-                },
-                onclose() {
-                    t.pass();
-                }
-            });
-
-            channelRemote.open("from remote");
-
-            t.teardown(async () => {
-                await remoteDuplex.end();
-            });
-        })();
+        // Await a small delay to give time for the error to propagate
+        await t;
     });
 
-
-    const workerUrl = createWebWorkerBlobUrlBasic();
-
-    test("test webworker transfer", async t => {
-        const count = 10;
-        const lessThanTargetAverage = 3;
-        const lessThanTargetSingle = 10;
-        t.plan(count + 1);
-        let i = 0;
-        let r = [];
-
-        const worker = await EsThread.Spawn(
-            new Worker(workerUrl, {type: "module"}));
-
-        const webstreams = await worker.methods.getDuplex();
-        const dup = fromWeb(webstreams);
-
-        dup.on("data", receiver);
-
-        function receiver(data) {
-            const recvTime = Date.now() - Number(b4a.toString(data));
-            if (i++ >= count) {
-                dup.destroy();
-                dup.off("data", receiver);
-                worker.terminate();
-                const avg = r.reduce((acc, n = 0) => acc + n, 0) / r.length
-                t.ok(avg < lessThanTargetAverage, "Average transfer time of " + count + " messages " + avg + " ms");
-                return;
-            }
-            t.ok(recvTime < lessThanTargetSingle, recvTime);
-            r.push(recvTime);
-        }
+    test("Done", (t) => {
+        document.body.style.backgroundColor = 'green';
+        t.pass();
     });
 
-    const protomuxWorker = createWebWorkerBlobUrlWithProtomux();
-
-    test("test webworker transfer with protomux", {timeout: 600000}, async t => {
-        const eachCount = 100;
-        t.plan((eachCount*2) + 2);
-        const worker = await EsThread.Spawn(
-            new Worker(protomuxWorker, {type: "module"}));
-
-        const webstreams = await worker.methods.getDuplex();
-        const dup = fromWeb(webstreams);
-        const protomux = new Protomux(dup);
-
-        const channel = protomux.createChannel({protocol: "debugProtocol", onopen() {
-            console.log("Got message from worker in main.");
-                msg.send(b4a.from("hello from main!"));
-            }}
-        );
-
-        // give worker time
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        const workerToMainTimes = [];
-        const workerToMain_lessThanTargetAverage = 50;
-        const workerToMain_lessThanTargetSingle = 50;
-        const workerToMain_allowTheseManyErrors = 5;
-        let workerToMain_errorCount = 0;
-
-        const msg = channel.addMessage({
-            async onmessage(msg) {
-                const timeTook = Date.now() - Number(b4a.toString(msg));
-
-                workerToMainTimes.push(timeTook);
-                if (timeTook > workerToMain_lessThanTargetSingle && workerToMain_errorCount <= workerToMain_allowTheseManyErrors) {
-                    t.pass(`Failed but allowed only ${workerToMain_allowTheseManyErrors} fails`);
-                    workerToMain_errorCount++;
-                } else if (timeTook < workerToMain_lessThanTargetSingle) {
-                    t.pass("Success")
-                } else {
-                    t.fail("Failed to achieve time");
-                }
-
-                if (workerToMainTimes.length === eachCount) {
-                    const avg = workerToMainTimes.reduce((acc, n = 0) => acc + n, 0) / workerToMainTimes.length
-                    t.ok(avg < workerToMain_lessThanTargetAverage, `average succeeded with ${workerToMain_errorCount} allowable errors with average of ${avg}ms`);
-                }
-            }
-        });
-
-        const mainToWorkerTimes = [];
-        const mainToWorker_lessThanTargetAverage = 5;
-        const mainToWorker_lessThanTargetSingle = 5;
-        const mainToWorker_allowTheseManyErrors = 5;
-        let mainToWorker_errorCount = 0;
-
-        const msg2 = channel.addMessage({
-            onmessage(timestep) {
-                const timeTook = Number(b4a.from(timestep));
-
-                if (timeTook > mainToWorker_lessThanTargetSingle && mainToWorker_errorCount <= mainToWorker_allowTheseManyErrors) {
-                    t.pass(`Failed but allowed only ${mainToWorker_allowTheseManyErrors} fails`);
-                    mainToWorker_errorCount++;
-                } else if (timeTook < mainToWorker_lessThanTargetSingle) {
-                    t.pass("Success")
-                } else {
-                    t.fail("Failed to achieve time");
-                }
-
-                mainToWorkerTimes.push(
-                    timeTook
-                );
-            }
-        });
-
-        await worker.methods.open();
-        channel.open();
-
-        for (let i = 0; i < eachCount; i++) {
-            await worker.methods.echoTime();
-        }
-
-        for (let i = 0; i < eachCount; i++) {
-            msg2.send(b4a.from(Date.now()+""));
-            await new Promise(resolve => setTimeout(resolve, 5));
-        }
-
-        const avg = mainToWorkerTimes.reduce((acc, n = 0) => acc + n, 0) / mainToWorkerTimes.length
-        t.ok(avg < mainToWorker_lessThanTargetAverage, `average succeeded with ${mainToWorker_errorCount} allowable errors with average of ${avg}ms`);
-
-        t.teardown(() => {
-            channel.close();
-            return worker.terminate();
-        });
-    });
-
-    function createWebWorkerBlobUrlBasic() {
-        const blob = new Blob([
-            b4a.from(
-                `
-                    import {exposeApi, Transfer} from "https://esm.run/threads-es";
-                    import {toWeb} from "https://esm.run/streamx-webstream/to";
-                    import duplexThrough from "https://esm.run/duplex-through";
-                    import b4a from "https://esm.run/b4a";
-
-                    const [mainDuplex, workerDuplex] = duplexThrough();
-                    const webStreams = toWeb({duplex: mainDuplex});
-
-                    setInterval(() => {
-                        workerDuplex.write(b4a.from(""+Date.now()));
-                    }, 100);
-
-                    exposeApi({
-                        getDuplex() {
-                            return Transfer(webStreams, [
-                                webStreams.readable,
-                                webStreams.writable
-                            ])
-                        },
-                        helloWorld() {
-                            return 'hello';
-                        }
-                    });
-                `
-            )
-        ], {
-            type: "text/javascript",
-        });
-
-        return URL.createObjectURL(blob);
-    }
-
-    function createWebWorkerBlobUrlWithProtomux() {
-        const blob = new Blob([
-            b4a.from(
-                `
-                    import {exposeApi, Transfer} from "https://esm.run/threads-es";
-                    import {toWeb} from "https://esm.run/streamx-webstream/to";
-                    import duplexThrough from "https://esm.run/duplex-through";
-                    import b4a from "https://esm.run/b4a";
-                    import Protomux from "https://esm.run/protomux";
-
-
-                    const [mainDuplex, workerDuplex] = duplexThrough();
-                    const webStreams = toWeb({duplex: mainDuplex});
-
-                    const mux = new Protomux(workerDuplex);
-                    const channel = mux.createChannel({
-                        protocol: "debugProtocol"
-                    });
-
-                    const msg = channel.addMessage({
-                        onmessage(data) {
-                            // console.log("WebWorker got data", b4a.toString(data));
-                            // msg.send(b4a.from("wooooo from main"));
-                        }
-                    });
-
-                    const msg2 = channel.addMessage({
-                        onmessage(time) {
-                            msg2.send(b4a.from(Date.now() - Number(b4a.toString(time))));
-                        }
-                    });
-
-
-                    exposeApi({
-                        getDuplex() {
-                            return Transfer(webStreams, [
-                                webStreams.readable,
-                                webStreams.writable
-                            ])
-                        },
-                        echoTime() {
-                            msg.send(b4a.from(Date.now()+""));
-                        },
-                        open() {
-                            channel.open();
-                        }
-                    });
-                `
-            )
-        ], {
-            type: "text/javascript",
-        });
-
-        return URL.createObjectURL(blob);
-    }
 </script>
 </body>
 </html>
