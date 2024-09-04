@@ -22,16 +22,30 @@ import { toWeb } from "streamx-webstream/to";
 import { fromWeb, toWeb } from "https://esm.run/streamx-webstream";
 ```
 
-## `fromWeb(webReadableStream, [options])`
+## API
 
-Convert Web ReadableStream to streamx.
+### `fromWeb`
 
-### Options
+#### Description:
+The `fromWeb` function wraps Web Streams (`ReadableStream` & `WritableStream`) and converts them into `streamx` streams. This is specifically designed for `streamx` and is not intended for native Node.js streams.
 
-- `options.write`: Function or WritableStream. Converts to streamx.duplex.
-- `options.asTransform`: Boolean. If true, converts to transform stream.
+#### Syntax:
+```javascript
+const streamx = fromWeb({ readable, writable });
+// or
+const streamx = fromWeb(readable);
+// or
+const streamx = fromWeb(writable);
+```
 
-### Example
+#### Parameters:
+- **readable** *(ReadableStream, optional)*: The readable stream to be wrapped.
+- **writable** *(WritableStream, optional)*: The writable stream to be wrapped.
+
+#### Returns:
+- *(Streamx.Duplex | Streamx.Readable | Streamx.Writable)*: A `streamx.Duplex` stream if both readable and writable streams are provided. A `streamx.Readable` or `streamx.Writable` stream if only one is provided.
+
+#### Example:
 
 ```javascript
 import { fromWeb } from "streamx-webstream";
@@ -45,52 +59,79 @@ const readableWebStream = new ReadableStream({
     }
 });
 
-const buffered = [];
-const readableStreamX = fromWeb(readableWebStream, {
-    map(buffer) {
-        return b4a.toString(buffer);
+const writableWebStream = new WritableStream({
+    write(chunk) {
+        console.log('Received chunk:', b4a.toString(chunk));
     }
 });
 
-readableStreamX.on("data", string => {
-    buffered.push(string);
+const duplexStreamx = fromWeb({ readable: readableWebStream, writable: writableWebStream });
+
+duplexStreamx.on('data', (chunk) => {
+    console.log('Read data:', b4a.toString(chunk));
 });
 
-readableStreamX.once("close", () => {
-    console.log(buffered); // hello, world
-});
-
-await readableStreamX.close();
+duplexStreamx.write(b4a.from('hello from write'));
+duplexStreamx.end();
 ```
 
-## `toWeb(streamxReadableOrObject)`
+### `toWeb`
 
-Convert streamx to Web Readable/WritableStream.
+#### Description:
+The `toWeb` function converts `streamx` streams into Web Streams (`ReadableStream` & `WritableStream`). This function is tailored for `streamx` streams and not for native Node.js streams.
 
-### Example
+#### Syntax:
+```javascript
+const webStream = toWeb(stream, asBytes);
+// or
+const webStream = toWeb({ readable: streamxReadable, writable: streamxWritable }, asBytes);
+```
+
+#### Parameters:
+- **stream** *(Streamx stream | Object)*: The `streamx` stream or an object containing `readable`, `writable`, or both to be converted into Web Streams.
+- **asBytes** *(boolean, optional)*: Indicates whether the stream should be handled as byte streams. Default is `false`.
+
+#### Returns:
+- *(ReadableStream | WritableStream | Object with ReadableStream and/or WritableStream)*: Returns Web Streams corresponding to the provided `streamx` stream:
+    - **ReadableStream** if the provided `streamx` stream is readable.
+    - **WritableStream** if the provided `streamx` stream is writable.
+    - **Object containing both `ReadableStream` and `WritableStream`** if both are provided.
+
+#### Example:
 
 ```javascript
 import { toWeb } from "streamx-webstream";
-import { Readable } from "streamx";
-import b4a from "b4a";
+import { Duplex } from "streamx";
+import b4a from 'b4a';
 
-const readable = new Readable();
-readable.push('hello');
-readable.push('world');
-readable.push(null);
+const duplexStreamx = new Duplex({
+  read(cb) {
+    this.push(b4a.from('Streamx Duplex Readable Data'));
+    this.push(null);
+    cb();
+  },
+  write(chunk, cb) {
+    console.log('Received duplex chunk:', b4a.toString(chunk));
+    cb();
+  }
+});
 
-const webStreamReadable = toWeb(readable);
-const reader = webStreamReadable.getReader();
+const { readable, writable } = toWeb(duplexStreamx);
+const reader = readable.getReader();
+const writer = writable.getWriter();
 
-const buffered = [];
-while (true) {
-    const { value, done } = await reader.read();
-    if (value) buffered.push(b4a.toString(value));
-    if (done) break;
-}
+reader.read().then(({ value, done }) => {
+  if (!done) {
+    console.log('Duplex Web Readable data:', b4a.toString(value));
+  }
+});
 
-console.log(buffered); // hello, world
+writer.write(b4a.from('Streamx Duplex Writable Data')).then(() => writer.close());
 ```
+
+## Detailed API Documentation
+
+For more detailed information on the API, refer to the [API Documentation](./API.md).
 
 ## License
 
