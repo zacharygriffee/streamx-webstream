@@ -1,4 +1,4 @@
-import test from 'brittle';
+import test, {solo} from 'brittle';
 import { fromWeb } from '../lib/fromWeb.js';
 
 
@@ -234,4 +234,30 @@ test('fromWeb should handle errors in WritableStream correctly', async (t) => {
     });
 
     writableStream.write(new TextEncoder().encode('data'));
+});
+
+
+test('fromWeb should signal end of streamx ReadableStream when Web ReadableStream pushes null', async (t) => {
+    t.plan(2);
+
+    // Create a ReadableStream that immediately pushes null to signal end-of-stream
+    const readableWebStream = new ReadableStream({
+        start(controller) {
+            controller.enqueue(null);
+            controller.close();
+        }
+    });
+
+    const readableStream = fromWeb({readable: readableWebStream});
+
+    let result = '';
+    readableStream.on('data', (chunk) => {
+        result += new TextDecoder().decode(chunk);
+    });
+
+    await new Promise(resolve => readableStream.on('end', resolve));
+
+    // Verify that the stream has ended
+    t.is(result, '');
+    t.pass();
 });

@@ -177,3 +177,135 @@ test('toWeb(fromWeb(DuplexStream)) should retain functionality', async (t) => {
         t.pass();
     });
 });
+
+
+// Test to ensure that null push will end streams when converted from and to web
+test('fromWeb(toWeb(ReadStream)) should handle null push properly', async (t) => {
+    t.plan(2);
+
+    const readableStreamx = new Readable({
+        read(cb) {
+            this.push(new TextEncoder().encode('hello'));
+            this.push(null);
+            cb();
+        }
+    });
+
+    const webStream = toWeb(readableStreamx);
+    const streamx = fromWeb({readable: webStream});
+
+    let result = '';
+    streamx.on('data', (chunk) => {
+        result += new TextDecoder().decode(chunk);
+    });
+
+    await new Promise(resolve => streamx.on('end', resolve));
+
+    t.is(result, 'hello');
+    t.pass();
+});
+
+test('toWeb(fromWeb(ReadStream)) should handle null push properly', async (t) => {
+    t.plan(2);
+
+    const readableWebStream = new ReadableStream({
+        start(controller) {
+            controller.enqueue(new TextEncoder().encode('world'));
+            controller.close();
+        }
+    });
+
+    const streamx = fromWeb({readable: readableWebStream});
+    const webStream = toWeb(streamx);
+
+    const reader = webStream.getReader();
+    let result = '';
+    let done = false;
+
+    while (!done) {
+        const {value, done: readerDone} = await reader.read();
+        if (readerDone) {
+            done = true;
+        } else {
+            result += new TextDecoder().decode(value);
+        }
+    }
+
+    t.is(result, 'world');
+    t.pass();
+});
+
+// Test to ensure that null write will end streams when converted from and to web
+test('fromWeb(toWeb(WriteStream)) should handle null write properly', async (t) => {
+    t.plan(2);
+
+    let writtenData = '';
+    const writableStreamx = new Writable({
+        write(chunk, cb) {
+            if (chunk !== null) {
+                writtenData += new TextDecoder().decode(chunk);
+            }
+            cb();
+        }
+    });
+
+    const webStream = toWeb(writableStreamx);
+    const streamx = fromWeb({writable: webStream});
+
+    streamx.write(new TextEncoder().encode('hello'));
+    streamx.write(null);
+    await new Promise(resolve => streamx.end(resolve));
+
+    t.is(writtenData, 'hello');
+    t.pass();
+});
+
+test('fromWeb(toWeb(ReadableStream)) should handle null write properly', async (t) => {
+    t.plan(2);
+    let writtenData = '';
+
+    const readableStreamx = new Readable({
+        read(cb) {
+            this.push(new TextEncoder().encode('hello'));
+            this.push(null); // Signal end of stream
+            cb();
+        }
+    });
+
+    const webStream = toWeb(readableStreamx);
+    const reader = webStream.getReader();
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value !== null) {
+            writtenData += new TextDecoder().decode(value);
+        }
+    }
+
+    t.is(writtenData, 'hello');
+    t.pass();
+});
+
+test('toWeb(fromWeb(ReadableStream)) should handle null write properly', async (t) => {
+    t.plan(2);
+    let writtenData = '';
+
+    const readableWebStream = new ReadableStream({
+        start(controller) {
+            controller.enqueue(new TextEncoder().encode('world'));
+            controller.close();
+        }
+    });
+
+    const streamx = fromWeb({ readable: readableWebStream });
+    streamx.on('data', (chunk) => {
+        if (chunk !== null) {
+            writtenData += new TextDecoder().decode(chunk);
+        }
+    });
+
+    await new Promise(resolve => streamx.on('end', resolve));
+    t.is(writtenData, 'world');
+    t.pass();
+});
