@@ -1,3 +1,7 @@
+import {ReadableStream, WritableStream} from 'node:stream/web';
+
+globalThis.ReadableStream = ReadableStream;
+globalThis.WritableStream = WritableStream;
 
 await Promise.all([
    import("./fromweb.test.js"),
@@ -7,5 +11,5 @@ await Promise.all([
    import("./errorPropagation.test.js"),
    import("./mixedOperations.test.js"),
    import("./compatibility.test.js"),
-    import("./largeDataTransfer.test.js")
+   import("./largeDataTransfer.test.js")
 ]);
